@@ -57,6 +57,18 @@ select{padding:6px 12px;border-radius:8px;border:1px solid var(--line);backgroun
 .star-block{margin-bottom:18px;}
 .star-title{font-size:14px;font-weight:700;color:#fff;margin:0 0 10px;
   display:flex;align-items:center;gap:8px;}
+/* 功能③ 排序开关：沿用胶囊风格，默认关闭 */
+.t3bar{display:flex;justify-content:flex-end;margin-bottom:14px;}
+.toggle{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;
+  border:1px solid var(--line);background:var(--panel);color:var(--mut);cursor:pointer;font-size:14px;transition:.2s;}
+.toggle .knob{width:30px;height:16px;border-radius:999px;background:var(--panel2);
+  border:1px solid var(--line);position:relative;transition:.2s;}
+.toggle .knob::after{content:"";position:absolute;top:1px;left:1px;width:12px;height:12px;
+  border-radius:50%;background:var(--mut);transition:.2s;}
+.toggle.on{color:#fff;border-color:rgba(90,202,248,.5);background:rgba(90,202,248,.16);
+  box-shadow:0 6px 18px rgba(90,202,248,.25);}
+.toggle.on .knob{background:#5ac8fa;border-color:#5ac8fa;}
+.toggle.on .knob::after{left:15px;background:#fff;}
 .empty{color:var(--mut);text-align:center;padding:26px 0;}
 </style>
 </head>
@@ -76,7 +88,7 @@ select{padding:6px 12px;border-radius:8px;border:1px solid var(--line);backgroun
 
   <!-- 功能① 属性池 -->
   <section id="t1">
-    <div class="ctrl"><label>选择属性：</label><select id="attrFilt"></select><label>阶段：</label><select id="stageFilt"><option value="全部">全部</option><option value="初阶">初阶</option><option value="终阶">终阶</option></select><label>赛季：</label><select id="seaFilt1"></select></div>
+    <div class="ctrl"><label>选择属性：</label><select id="attrFilt"></select><label>赛季：</label><select id="seaFilt1"></select><label>星光值阶段：</label><select id="stageFilt"><option value="全部">全部</option><option value="初阶">初阶</option><option value="终阶">终阶</option></select></div>
     <div class="panel-title">可能出现的异色精灵 <span class="cnt" id="cX"></span></div>
     <div class="grid" id="gX"></div>
     <div class="empty" id="eX" style="display:none"></div>
@@ -99,6 +111,9 @@ select{padding:6px 12px;border-radius:8px;border:1px solid var(--line);backgroun
 
   <!-- 功能③ 本赛季异色 -->
   <section id="t3" style="display:none">
+    <div class="t3bar">
+      <button class="toggle" id="t3SortBtn" aria-pressed="false"><span class="knob"></span><span>按属性排序</span></button>
+    </div>
     <div id="gSlots"></div>
   </section>
 </div>
@@ -221,9 +236,32 @@ seaSel.addEventListener("change", function(){
 shySel.addEventListener("change", runT2);
 
 // --- 功能③ 本赛季异色 ---
+var t3AttrSort = false;   // 按属性排序开关：默认关闭，不持久化
 function renderT3(){
   var box = document.getElementById("gSlots");
-  var groups = {}, none = 0, cur = D.curSeason;
+  var cur = D.curSeason;
+  if(t3AttrSort){
+    // 按 18 属性既定顺序逐行；双属性在两个属性行各出现一次；无对应属性不显示；空属性行不渲染
+    var rows = [];
+    var list = D.shiny.filter(function(x){ return x.sea===cur; });
+    ATTRS.forEach(function(a){
+      var items = list.filter(function(x){ return x.a1===a || x.a2===a; });
+      if(items.length) rows.push({a:a, items:items});
+    });
+    var missing = ATTRS.filter(function(a){ return !list.some(function(x){ return x.a1===a || x.a2===a; }); });
+    var html2 = rows.map(function(r){
+      return '<div class="star-block"><div class="star-title"><img class="aicon" style="width:18px;height:18px" src="'+(D.aicons[r.a]||'')+'">'+r.a+' <span class="cnt">'+r.items.length+' 只</span></div><div class="grid">'+r.items.map(function(x){return card(x,"shy");}).join("")+'</div></div>';
+    }).join("");
+    if(missing.length){
+      html2 += '<div class="star-block"><div class="star-title">无对应属性 <span class="cnt">'+missing.length+' 个</span></div><div class="chips" style="justify-content:flex-start">'
+        + missing.map(function(a){ return '<span class="chip"><img class="aicon" src="'+(D.aicons[a]||'')+'">'+a+'</span>'; }).join("")
+        + '</div></div>';
+    }
+    box.innerHTML = html2;
+    box.style.display = (rows.length || missing.length) ? "block" : "none";
+    return;
+  }
+  var groups = {}, none = 0;
   D.shiny.forEach(function(x){
     if(x.sea !== cur) return;                 // 只展示当前赛季异色
     if(x.spec){ (groups[x.spec]=groups[x.spec]||[]).push(x); } else none++;
@@ -239,6 +277,12 @@ function renderT3(){
   box.innerHTML = html;
   box.style.display = "block";
 }
+document.getElementById("t3SortBtn").addEventListener("click", function(){
+  t3AttrSort = !t3AttrSort;
+  this.classList.toggle("on", t3AttrSort);
+  this.setAttribute("aria-pressed", t3AttrSort ? "true" : "false");
+  renderT3();
+});
 
 // --- tabs ---
 document.querySelectorAll(".tab").forEach(function(btn){
